@@ -2,7 +2,7 @@ package com.habittracker.app.habit.svc.impl;
 
 import com.habittracker.app.habit.data.dto.requests.CreateHabitRequest;
 import com.habittracker.app.habit.data.dto.response.CreateHabitResponse;
-import com.habittracker.app.habit.data.dto.response.HabitsResponse;
+import com.habittracker.app.habit.data.dto.response.HabitResponse;
 import com.habittracker.app.habit.data.models.Habit;
 import com.habittracker.app.habit.repo.iface.HabitRepo;
 import com.habittracker.app.habit.svc.iface.HabitSvc;
@@ -40,14 +40,14 @@ public class HabitSvcImpl implements HabitSvc {
     }
 
     @Override
-    public List<HabitsResponse> fetchHabits() {
+    public List<HabitResponse> fetchHabits() {
         List<Habit> habits=  habitRepo.getHabits();
-        List <HabitsResponse> habitsResponses = new ArrayList<>();
+        List <HabitResponse> habitsResponses = new ArrayList<>();
         if (CollectionUtils.isEmpty(habits)) {
             return habitsResponses;
         } else {
             for (Habit item : habits) {
-                habitsResponses.add(HabitsResponse.builder()
+                habitsResponses.add(HabitResponse.builder()
                         .id(item.getId())
                         .frequency(item.getFrequency())
                         .name(item.getName())
@@ -55,5 +55,22 @@ public class HabitSvcImpl implements HabitSvc {
             }
             return habitsResponses;
         }
+    }
+
+    @Override
+    public HabitResponse getHabit(String id) {
+        Habit habit = habitRepo.getHabitById(id);
+//        if (habit == null) {
+//            throw new
+//        }
+        HabitResponse habitResponse = HabitResponse.builder()
+                .id(habit.getId())
+                .frequency(habit.getFrequency())
+                .name(habit.getName())
+                .build();
+
+        return habitResponse;
+
+
     }
 }

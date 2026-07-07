@@ -9,4 +9,6 @@ public interface HabitRepo {
     boolean createhabitRequest(Habit habit);
 
     List<Habit> getHabits();
+
+    Habit getHabitById(String id);
 }

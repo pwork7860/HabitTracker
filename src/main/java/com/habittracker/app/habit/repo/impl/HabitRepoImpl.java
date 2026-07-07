@@ -10,7 +10,7 @@ import java.util.List;
 @Service
 public class HabitRepoImpl implements HabitRepo {
 
-    static List<Habit> habits = new ArrayList<>();
+    List<Habit> habits = new ArrayList<>();
 
     @Override
     public boolean createhabitRequest(Habit habit) {
@@ -20,5 +20,16 @@ public class HabitRepoImpl implements HabitRepo {
     @Override
     public List<Habit> getHabits() {
         return habits;
+    }
+
+    @Override
+    public Habit getHabitById(String id) {
+        for (Habit item : habits) {
+            if (item.getId().equals(id)) {
+                return item;
+            }
+        }
+        return null;
+
     }
 }

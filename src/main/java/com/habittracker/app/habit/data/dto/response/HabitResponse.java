@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class HabitsResponse {
+public class HabitResponse {
     private String id;
     private String name;
     private String frequency;
