@@ -5,6 +5,7 @@ import com.habittracker.app.habit.repo.iface.HabitRepo;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 @Service
@@ -31,5 +32,30 @@ public class HabitRepoImpl implements HabitRepo {
         }
         return null;
 
+    }
+
+    @Override
+    public boolean updateHabit(Habit habit) {
+        for (Habit item : habits) {
+            if (item.getId().equals(habit.getId())) {
+                item.setName(habit.getName());
+                item.setFrequency(habit.getFrequency());
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public boolean deleteHabit(String id) {
+        Iterator<Habit> iterator = habits.iterator();
+
+        while (iterator.hasNext()) {
+            Habit item = iterator.next();
+            if (item.getId().equals(id)) {
+                iterator.remove();
+                return true;
+            }
+        }
+    return false;
     }
 }

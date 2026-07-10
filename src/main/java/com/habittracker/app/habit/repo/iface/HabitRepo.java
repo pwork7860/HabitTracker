@@ -11,4 +11,8 @@ public interface HabitRepo {
     List<Habit> getHabits();
 
     Habit getHabitById(String id);
+
+    boolean updateHabit(Habit habit);
+
+    boolean deleteHabit(String id);
 }

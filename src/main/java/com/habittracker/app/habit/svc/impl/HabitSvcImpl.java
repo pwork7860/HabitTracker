@@ -1,6 +1,7 @@
 package com.habittracker.app.habit.svc.impl;
 
 import com.habittracker.app.habit.data.dto.requests.CreateHabitRequest;
+import com.habittracker.app.habit.data.dto.requests.UpdateHabitRequest;
 import com.habittracker.app.habit.data.dto.response.CreateHabitResponse;
 import com.habittracker.app.habit.data.dto.response.HabitResponse;
 import com.habittracker.app.habit.data.models.Habit;
@@ -72,5 +73,34 @@ public class HabitSvcImpl implements HabitSvc {
         return habitResponse;
 
 
+    }
+
+    @Override
+    public CreateHabitResponse updateHabit(UpdateHabitRequest request, String id) {
+        CreateHabitResponse  habitResponse = CreateHabitResponse.builder().build();
+        Habit habit = habitRepo.getHabitById(id);
+        if (habit != null) {
+            if (request.getFrequency() != null) {
+                habit.setFrequency(request.getFrequency());
+            }
+            if (request.getName() != null) {
+                habit.setName(request.getName());
+            }
+            habitRepo.updateHabit(habit);
+            habitResponse.setId(habit.getId());
+            habitResponse.setFrequency(habit.getFrequency());
+            habitResponse.setName(habit.getName());
+        }
+        return habitResponse;
+    }
+
+    @Override
+    public String deleteHabit(String id) {
+        Habit habit = habitRepo.getHabitById(id);
+        if (habit != null) {
+            habitRepo.deleteHabit(id);
+            return "Habit Deleted Successfully";
+        }
+        return "No Hbait found for Id : " + id;
     }
 }
