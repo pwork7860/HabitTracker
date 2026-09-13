@@ -1,106 +1,153 @@
 package com.habittracker.app.habit.svc.impl;
 
+import com.habittracker.app.commons.dto.response.ApiResponse;
+import com.habittracker.app.commons.enums.Status;
 import com.habittracker.app.habit.data.dto.requests.CreateHabitRequest;
 import com.habittracker.app.habit.data.dto.requests.UpdateHabitRequest;
 import com.habittracker.app.habit.data.dto.response.CreateHabitResponse;
 import com.habittracker.app.habit.data.dto.response.HabitResponse;
+import com.habittracker.app.habit.data.dto.response.MarkHabitCompleteResponse;
 import com.habittracker.app.habit.data.models.Habit;
+import com.habittracker.app.habit.data.models.HabitCompletion;
+import com.habittracker.app.habit.eception.DuplicateHabitNameException;
+import com.habittracker.app.habit.eception.HabitNotFoundException;
+import com.habittracker.app.habit.repo.iface.HabitCompletionrepo;
 import com.habittracker.app.habit.repo.iface.HabitRepo;
 import com.habittracker.app.habit.svc.iface.HabitSvc;
+import com.habittracker.app.habit.utils.HabitAdapter;
+import com.habittracker.app.jwt.svc.utils.AuthenticationUtils;
+import com.habittracker.app.user.data.model.User;
+import com.habittracker.app.user.repo.iface.UserRepo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.ObjectUtils;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class HabitSvcImpl implements HabitSvc {
 
     private final HabitRepo habitRepo;
+    private final HabitCompletionrepo habitCompletionRepo;
+    private final UserRepo userRepo;
 
     @Override
     public CreateHabitResponse createhabit(CreateHabitRequest request) {
-
-        Habit habit = Habit.builder()
-                .id(UUID.randomUUID().toString())
-                .name(request.getName())
-                .frequency(request.getFrequency())
-                .build();
-
-        if (habitRepo.createhabitRequest(habit)) {
-            return CreateHabitResponse.builder()
-                    .id(habit.getId())
-                    .name(habit.getName())
-                    .frequency(habit.getFrequency())
-                    .build();
+        String userid = AuthenticationUtils.getUserIdFromAuth();
+        if(habitRepo.findByUserIdAndNameAndStatus(
+                userid, request.getName(), Status.ACTIVE).isPresent()) {
+            throw new DuplicateHabitNameException(request.getName());
         }
-        return CreateHabitResponse.builder().build();
+        Habit habit = HabitAdapter.getHabit(request, userid);
+        habitRepo.save(habit);
+        return HabitAdapter.getCreatHabitResponse(habit);
     }
 
     @Override
     public List<HabitResponse> fetchHabits() {
-        List<Habit> habits=  habitRepo.getHabits();
-        List <HabitResponse> habitsResponses = new ArrayList<>();
+        String userId = AuthenticationUtils.getUserIdFromAuth();
+        User user = userRepo.findById(userId).orElseThrow();
+        List <HabitResponse> habitsResponse = new ArrayList<>();
+        List<Habit> habits =  habitRepo.findByUserIdAndStatus(userId, Status.ACTIVE);
         if (CollectionUtils.isEmpty(habits)) {
-            return habitsResponses;
-        } else {
+            return habitsResponse;
+        }
+        LocalDate today = LocalDate.now(ZoneId.of(user.getTimeZone()));
+        List<HabitCompletion> habitsCompletedToday =
+                habitCompletionRepo.findByUserIdAndCompletedDate(userId, today);
+        Set<String> completedHabitIds = habitsCompletedToday.stream()
+                .map(HabitCompletion::getHabitId)
+                .collect(Collectors.toSet());
             for (Habit item : habits) {
-                habitsResponses.add(HabitResponse.builder()
+                habitsResponse.add(HabitResponse.builder()
                         .id(item.getId())
                         .frequency(item.getFrequency())
                         .name(item.getName())
+                        .completedToday(
+                                completedHabitIds.contains(item.getId()))
                         .build());
             }
-            return habitsResponses;
+            return habitsResponse;
         }
-    }
+
 
     @Override
     public HabitResponse getHabit(String id) {
-        Habit habit = habitRepo.getHabitById(id);
-//        if (habit == null) {
-//            throw new
-//        }
-        HabitResponse habitResponse = HabitResponse.builder()
-                .id(habit.getId())
-                .frequency(habit.getFrequency())
-                .name(habit.getName())
+        String userid = AuthenticationUtils.getUserIdFromAuth();
+        Optional<Habit> habit =
+                habitRepo.findByIdAndUserIdAndStatus(id, userid, Status.ACTIVE);
+        if (habit.isEmpty()) {
+            throw new HabitNotFoundException(id);
+        }
+        return HabitResponse.builder()
+                .id(habit.get().getId())
+                .frequency(habit.get().getFrequency())
+                .name(habit.get().getName())
                 .build();
-
-        return habitResponse;
 
 
     }
 
     @Override
     public CreateHabitResponse updateHabit(UpdateHabitRequest request, String id) {
-        CreateHabitResponse  habitResponse = CreateHabitResponse.builder().build();
-        Habit habit = habitRepo.getHabitById(id);
-        if (habit != null) {
-            if (request.getFrequency() != null) {
-                habit.setFrequency(request.getFrequency());
-            }
-            if (request.getName() != null) {
-                habit.setName(request.getName());
-            }
-            habitRepo.updateHabit(habit);
-            habitResponse.setId(habit.getId());
-            habitResponse.setFrequency(habit.getFrequency());
-            habitResponse.setName(habit.getName());
+        String userId = AuthenticationUtils.getUserIdFromAuth();
+        Optional<Habit> habit = habitRepo.findByIdAndUserIdAndStatus(id, userId, Status.ACTIVE);
+        if (habit.isEmpty()) {
+            throw new HabitNotFoundException(id);
         }
-        return habitResponse;
+        if (request.getName() != null) {
+            Optional<Habit> existingHabit =
+                    habitRepo.findByUserIdAndNameAndStatus(userId,
+                            request.getName(), Status.ACTIVE);
+            if (existingHabit.isPresent()
+                    && !existingHabit.get().getId().equals(id)) {
+                throw new DuplicateHabitNameException(request.getName());
+            }
+            habit.get().setName(request.getName());
+        }
+        if (request.getFrequency() != null) {
+            habit.get().setFrequency(request.getFrequency());
+        }
+        Habit updatedHabit = habitRepo.save(habit.get());
+        return CreateHabitResponse.builder()
+                .id(updatedHabit.getId())
+                .frequency(updatedHabit.getFrequency())
+                .name(updatedHabit.getName())
+                .build();
     }
 
     @Override
     public String deleteHabit(String id) {
-        Habit habit = habitRepo.getHabitById(id);
-        if (habit != null) {
-            habitRepo.deleteHabit(id);
-            return "Habit Deleted Successfully";
+        String userId = AuthenticationUtils.getUserIdFromAuth();
+        Optional<Habit> habit = habitRepo.findByIdAndUserIdAndStatus(id, userId, Status.ACTIVE);
+        if (habit.isEmpty()) {
+            throw new HabitNotFoundException(id);
         }
-        return "No Hbait found for Id : " + id;
+        Habit existingHabit = habit.get();
+        existingHabit.setStatus(Status.INACTIVE);
+        habitRepo.save(existingHabit);
+        return "Habit Deleted Successfully";
+    }
+
+    @Override
+    public MarkHabitCompleteResponse markHabitComplete(String id) {
+
+        String userId = AuthenticationUtils.getUserIdFromAuth();
+        User user = userRepo.findById(userId).orElseThrow();
+        Optional<Habit> habit = habitRepo.findByIdAndUserIdAndStatus(
+                id, userId, Status.ACTIVE);
+        if (habit.isEmpty()) {
+            throw new HabitNotFoundException(id);
+        }
+        HabitCompletion completion = HabitAdapter.getHabitCompletion(habit.get(),
+                user.getTimeZone());
+        habitCompletionRepo.save(completion);
+        return MarkHabitCompleteResponse.builder()
+                .build();
     }
 }
